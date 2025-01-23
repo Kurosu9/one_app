@@ -8,9 +8,8 @@ const SplashScreen = () => {
   const router = useRouter();
 
   useEffect(() => {
-    // Переход на AuthScreen через 3 секунды
     setTimeout(() => {
-      router.replace('/auth'); // заменяет текущий экран на AuthScreen
+      router.replace('/auth');
     }, 3000);
   }, [router]);
 
@@ -29,7 +28,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#F4FBF8',
   },
   text: {
     fontSize: 24,

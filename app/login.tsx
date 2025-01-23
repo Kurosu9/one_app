@@ -1,7 +1,9 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { View, Text, Image, TextInput, TouchableOpacity, StyleSheet, Button,} from 'react-native';
+import { View, Text, Image, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebaseConfig'; // Импортируем настройки Firebase
 
 const LoginScreen = () => {
   const router = useRouter();
@@ -9,11 +11,26 @@ const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = () => {
-    console.log('Email:', email);
-    console.log('Password:', password);
-    router.push('/(tabs)/dashboard');
+  // Функция для входа с Firebase
+  const handleLogin = async () => {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      console.log('User logged in:', email);
+      router.push('/(tabs)/dashboard'); // Перенаправляем на главный экран
+    } catch (error) {
+      // Обработка ошибок
+      if (error === 'auth/invalid-email') {
+        Alert.alert('Ошибка', 'Неверный формат email');
+      } else if (error === 'auth/user-not-found') {
+        Alert.alert('Ошибка', 'Пользователь не найден');
+      } else if (error === 'auth/wrong-password') {
+        Alert.alert('Ошибка', 'Неверный пароль');
+      } else {
+        Alert.alert('Ошибка', 'Произошла ошибка. Попробуйте еще раз');
+      }
+    }
   };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -46,9 +63,9 @@ const LoginScreen = () => {
           <Text style={styles.buttonText}>Login</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push('/register')}>
+        {/* <TouchableOpacity onPress={() => router.push('/register')}>
           <Text style={styles.link}>Register</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
         <TouchableOpacity onPress={() => router.push('/')}>
           <Text style={styles.link}>Forgot password?</Text>
         </TouchableOpacity>
@@ -60,7 +77,7 @@ const LoginScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F4FBF8',
   },
   container: {
     flex: 1,
@@ -72,9 +89,6 @@ const styles = StyleSheet.create({
     height: 300,
     marginTop: -50,
   },
-  text: {
-    fontSize: 24,
-  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -85,7 +99,7 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     alignSelf: 'flex-start',
     fontSize: 16,
-    fontWeight: 500,
+    fontWeight: '500',
     marginBottom: 6,
   },
   input: {
@@ -96,6 +110,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     paddingHorizontal: 15,
     marginBottom: 15,
+    backgroundColor: '#fff',
   },
   button: {
     backgroundColor: '#00ACC1',
@@ -113,12 +128,12 @@ const styles = StyleSheet.create({
     height: 30,
     color: 'white',
     marginTop: -8,
-    fontWeight: 500,
+    fontWeight: '500',
   },
   link: {
     marginTop: 15,
     fontSize: 18,
-    fontWeight: 500,
+    fontWeight: '500',
     color: '#FB8C00', 
     textDecorationLine: 'underline',
     textAlign: 'center',
