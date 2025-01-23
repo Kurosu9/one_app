@@ -1,24 +1,68 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Tabs } from 'expo-router';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { router, Tabs } from 'expo-router';
 
 export default function TabLayout() {
   return (
-    <Tabs screenOptions={{ tabBarActiveTintColor: 'blue' }}>
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: 'orange',
+        tabBarInactiveTintColor: 'white',
+        tabBarStyle: {
+          backgroundColor: '#00ACC1',
+          height: 70,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          marginTop: 5,
+        },
+        tabBarIconStyle: {
+          alignSelf: 'center',
+          marginTop: 8,
+        },
+      }}
+    >
       <Tabs.Screen
         name="dashboard"
         options={{
           title: 'Dashboards',
           headerShown: false,
-          tabBarStyle: { backgroundColor: '#f8f8f8' },
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="home" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <MaterialIcons name="dashboard" size={40} color={color} width={40} height={40}/>
+          ),
         }}
       />
-      <Tabs.Screen  
+      <Tabs.Screen
         name="createtask"
         options={{
           title: '',
-          headerShown: false,
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="home" color={color} />,
+          headerTitle: 'Create Task',
+          headerShown: true,
+          // headerStyle: { backgroundColor: '#00ACC1', },
+          // headerTintColor: '',
+          headerTitleStyle: {
+            fontSize: 24,
+            fontWeight: 500,
+          },
+          headerTitleAlign: 'center',
+          tabBarStyle: {
+            display: 'none',
+          },
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="add-circle" size={60} color={color} width={60} height={60} style={{marginTop: 10}}/>
+          ),
+          headerLeft: () => (
+            <Ionicons
+              name="arrow-back"
+              size={24}
+              color="black"
+              onPress={() => {
+                router.push('/dashboard');
+              }}
+              style={{ marginLeft: 15 }}
+            />
+          ),
         }}
       />
       <Tabs.Screen
@@ -26,7 +70,9 @@ export default function TabLayout() {
         options={{
           title: 'You',
           headerShown: false,
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="cog" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <FontAwesome name="user-circle-o" size={35} color={color} width={35} height={35}/>
+          ),
         }}
       />
     </Tabs>

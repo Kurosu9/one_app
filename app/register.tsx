@@ -1,25 +1,33 @@
 import { useRouter } from 'expo-router';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, Alert } from 'react-native';
 import { ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
 import { useState } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
-
-
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getFirestore, doc, setDoc } from 'firebase/firestore'; 
+import { app } from '../firebaseConfig'; // Импортируйте настройки Firebase
 
 const RegisterScreen = () => {
+  const [inn, setInn] = useState('');
+  const [id, setId] = useState('');
+  const [email, setEmail] = useState('');
+  const [location, setLocation] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [sex, setSex] = useState('');
+  const [name, setName] = useState('');
+  const [surname, setSurname] = useState('');
+  const [patronymic, setPatronymic] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [date, setDate] = useState(new Date());
+  const [formattedDate, setFormattedDate] = useState("dd.mm.yyyy");
+  const [show, setShow] = useState(false);
 
   const router = useRouter();
-  
-  const handleLogin = () => {
-    router.push('/dashboard');
-  };
-
-  const [date, setDate] = useState(new Date());
-  const [show, setShow] = useState(false);
-  const [formattedDate, setFormattedDate] = useState("dd.mm.yyyy");
+  const auth = getAuth(app); // Используем Firebase Authentication
+  const db = getFirestore(app); // Используем Firebase Firestore для хранения данных
 
   const formatDate = (date: Date) => {
     const day = ("0" + date.getDate()).slice(-2);
@@ -33,27 +41,79 @@ const RegisterScreen = () => {
       setShow(false);
       return;
     }
-
+  
     if (selectedDate) {
       setDate(selectedDate);
       setFormattedDate(formatDate(selectedDate));
     }
-
+    
     if (Platform.OS === 'ios') {
       setShow(false);
     }
+    
+    setShow(false);
   };
 
   const showDatepicker = () => {
     setShow(true);
   };
 
-  const [phoneNumber, setPhoneNumber] = useState('');
-
   const handlePhoneNumberChange = (text: string) => {
-    if (text === '' || /^[+]?[0-9]*$/.test(text)) {
-      setPhoneNumber(text);
+    const cleaned = text.replace(/[^\d+]/g, '');
+
+    const formatted = cleaned.replace(/(\d{3})(?=\d)/g, '$1 ');
+
+    setPhoneNumber(formatted);
+  };
+
+  const handleRegister = async () => {
+    if (password !== confirmPassword) {
+      Alert.alert('Пароли не совпадают!');
+      return;
     }
+
+    try {
+      // Регистрируем пользователя в Firebase
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Сохраняем дополнительные данные в Firestore
+      await setDoc(doc(db, 'users', user.uid), {
+        inn,
+        id,
+        surname,
+        name,
+        patronymic,
+        phoneNumber,
+        birthdate: formattedDate, // Сохраняем дату рождения как строку
+        sex,
+        location,
+        email,
+      });
+
+      // Перенаправляем на экран Dashboard после успешной регистрации
+      router.push('/dashboard');
+    } catch (error) {
+      Alert.alert('Ошибка регистрации');
+    }
+  };
+
+  // Функция проверки на заполненность всех полей
+  const isFormValid = () => {
+    return (
+      inn &&
+      id &&
+      email &&
+      location &&
+      password &&
+      confirmPassword &&
+      sex &&
+      name &&
+      surname &&
+      patronymic &&
+      phoneNumber &&
+      formattedDate !== "dd.mm.yyyy"
+    );
   };
 
   return (
@@ -61,34 +121,52 @@ const RegisterScreen = () => {
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>SIGN UP</Text>
 
-        <Text style={styles.subtitle}>Registration for 13-15 age click here</Text>
+        <Text style={styles.subtitle}>Registration for 14-15 age click here</Text>
         
         <Text style={styles.label}>INN</Text>
         <TextInput
           style={styles.input}
           placeholder="Enter your INN"
           autoCapitalize="none"
+          keyboardType="numeric"
+          value={inn}
+          onChangeText={setInn}
+          maxLength={16}
+        />
+
+        <Text style={styles.label}>ID</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter your INN"
+          autoCapitalize="none"
+          keyboardType="numeric"
+          value={id}
+          onChangeText={setId}
+          maxLength={16}
         />
 
         <Text style={styles.label}>Surname</Text>
         <TextInput
           style={styles.input}
           placeholder="Enter your surname"
-          secureTextEntry
+          value={surname}
+          onChangeText={setSurname}
         />
 
         <Text style={styles.label}>Name</Text>
         <TextInput
           style={styles.input}
           placeholder="Enter your name"
-          secureTextEntry
+          value={name}
+          onChangeText={setName}
         />
 
         <Text style={styles.label}>Patronymic</Text>
         <TextInput
           style={styles.input}
           placeholder="Enter your patronymic"
-          secureTextEntry
+          value={patronymic}
+          onChangeText={setPatronymic}
         />
 
         <Text style={styles.label}>Phone number</Text>
@@ -96,12 +174,17 @@ const RegisterScreen = () => {
           style={styles.input}
           value={phoneNumber}
           onChangeText={handlePhoneNumberChange}
-          placeholder="+996 (555) 555-5555"
+          placeholder="+996 555 555 555"
           keyboardType="phone-pad"
+          maxLength={16}
+          onFocus={() => {
+            if (phoneNumber === '') {
+              setPhoneNumber('+');
+            }
+          }}
         />
 
         <Text style={styles.label}>Date of birth</Text>
-        
         <TouchableOpacity onPress={showDatepicker} style={styles.input}>
           <Text style={styles.inputDate}>{formattedDate}</Text>
         </TouchableOpacity>
@@ -133,13 +216,26 @@ const RegisterScreen = () => {
         <TextInput
           style={styles.input}
           placeholder="Enter your city/region"
-          secureTextEntry
+          value={location}
+          onChangeText={setLocation}
+        />
+
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter your email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
         />
 
         <Text style={styles.label}>Password</Text>
         <TextInput
           style={styles.input}
           placeholder="Enter your password"
+          value={password}
+          onChangeText={setPassword}
           secureTextEntry
         />
 
@@ -147,13 +243,18 @@ const RegisterScreen = () => {
         <TextInput
           style={styles.input}
           placeholder="Enter your password again"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
           secureTextEntry
         />
 
-        <TouchableOpacity style={styles.button} onPress={handleLogin}>
+        <TouchableOpacity
+          style={[styles.button, !isFormValid() && styles.buttonDisabled]}
+          onPress={handleRegister}
+          disabled={!isFormValid()}
+        >
           <Text style={styles.buttonText}>Sign up</Text>
         </TouchableOpacity>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -162,7 +263,7 @@ const RegisterScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F4FBF8',
   },
   container: {
     flexGrow: 1,
@@ -195,6 +296,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     paddingHorizontal: 15,
     marginBottom: 15,
+    backgroundColor: '#fff',
   },
   pickerWrapper: {
     height: 50,
@@ -228,6 +330,9 @@ const styles = StyleSheet.create({
     height: 50,
     margin: 'auto',
     marginBottom: 70,
+  },
+  buttonDisabled: {
+    backgroundColor: '#ccc',
   },
   buttonText: {
     fontSize: 20,

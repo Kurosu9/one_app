@@ -35,7 +35,7 @@ const AuthScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F4FBF8',
   },
   container: {
     flex: 1,
