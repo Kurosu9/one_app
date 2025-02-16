@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
-import { collection, getDocs } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { getAuth, signOut, deleteUser } from 'firebase/auth';
 import Entypo from '@expo/vector-icons/Entypo';
 import AntDesign from '@expo/vector-icons/AntDesign';
-import { useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';;
 
 export default function Tab() {
   const [userData, setUserData] = useState(null);
@@ -15,19 +15,31 @@ export default function Tab() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, 'users'));
-        const data = [];
-        querySnapshot.forEach((doc) => {
-          data.push({ id: doc.id, ...doc.data() });
-        });
-        setUserData(data[0]);
+        const auth = getAuth();
+        const user = auth.currentUser;
+  
+        if (user) {
+          const userDocRef = doc(db, 'users', user.uid);
+          const docSnapshot = await getDoc(userDocRef);
+  
+          if (docSnapshot.exists()) {
+            const userData = docSnapshot.data();
+            console.log('Fetched user data:', userData);
+            setUserData(userData);
+          } else {
+            console.log('No such user document!');
+          }
+        } else {
+          console.log('No user is signed in');
+        }
       } catch (error) {
         console.error('Error fetching user data:', error);
       }
     };
-
+  
     fetchUserData();
   }, []);
+  
 
   const handleSignOut = async () => {
     const auth = getAuth();
@@ -39,7 +51,7 @@ export default function Tab() {
       Alert.alert('Success', 'You have been signed out successfully.');
     } catch (error) {
       console.error('Error signing out:', error);
-      Alert.alert('Error', 'Failed to sign out: ' + error.message);
+      Alert.alert('Error', 'Failed to sign out: ' + error);
     }
   };
 
@@ -58,12 +70,21 @@ export default function Tab() {
             style: 'destructive',
             onPress: async () => {
               try {
-                await deleteUser(user);
+                // 1. Удаляем данные пользователя из Firestore
+                await deleteDoc(doc(db, 'users', user.uid)); // Удаляем документ пользователя из коллекции users
+  
+                // 2. Удаляем пользователя из Firebase Authentication
+                await deleteUser(user); // Удаляем пользователя из Authentication
+  
+                // 3. Выйти из системы и очистить данные
+                console.log('Account deleted successfully');
+                setUserData(null); // Очистить данные пользователя
+                router.replace('/auth'); // Перенаправить на экран авторизации
+  
                 Alert.alert('Success', 'Your account has been deleted.');
-                setUserData(null); // Очистка данных пользователя
-                router.replace('/auth'); // Перенаправление на экран авторизации
               } catch (error) {
-                Alert.alert('Error', 'Failed to delete account: ' + error.message);
+                console.error('Error deleting account:', error);
+                Alert.alert('Error', 'Failed to delete account: ' + error);
               }
             },
           },
@@ -72,7 +93,7 @@ export default function Tab() {
     } else {
       Alert.alert('Error', 'No user is signed in.');
     }
-  };  
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -108,7 +129,7 @@ export default function Tab() {
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
-  );
+  );  
 }
 
 const styles = StyleSheet.create({
