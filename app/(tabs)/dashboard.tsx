@@ -1,59 +1,94 @@
-import { StyleSheet, SafeAreaView, Text, View, TextInput, TouchableOpacity, Image, ScrollView } from 'react-native';
-import React, { cloneElement, useState } from 'react';
+import { StyleSheet, SafeAreaView, Text, View, TextInput, TouchableOpacity, Image, ScrollView, Alert } from 'react-native';
+import React, { cloneElement, useEffect, useState } from 'react';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
+import { db } from '../../firebaseConfig';
+import { collection, doc, onSnapshot, query, updateDoc } from 'firebase/firestore';
 
 
 export default function Tab() {
 
     const router = useRouter();
-
     const [activeTab, setActiveTab] = useState('new'); // New tab is the default
+    const [tasks, setTasks] = useState([]); // Состояние для хранения задач
+    const [filteredTasks, setFilteredTasks] = useState([]); // Состояние для отфильтрованных задач
+    const [searchQuery, setSearchQuery] = useState(''); // Состояние для поиска
+
+    useEffect(() => {
+        const q = query(collection(db, 'tasks'));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const tasksList = [];
+            querySnapshot.forEach((doc) => {
+                tasksList.push({ id: doc.id, ...doc.data() });
+            });
+            setTasks(tasksList);
+            setFilteredTasks(tasksList); // Инициализируем отфильтрованные задачи
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    // Фильтрация задач по статусу (вкладки New и Responds)
+    useEffect(() => {
+        if (activeTab === 'new') {
+            setFilteredTasks(tasks.filter(task => task.status === 'free'));
+        } else if (activeTab === 'responds') {
+            setFilteredTasks(tasks.filter(task => task.status === 'under review' || task.status === 'hired'));
+        }
+    }, [activeTab, tasks]);
+
+    // Поиск задач
+    useEffect(() => {
+        if (searchQuery) {
+            const filtered = tasks.filter(task =>
+                task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                task.price.toString().includes(searchQuery)
+            );
+            setFilteredTasks(filtered);
+        } else {
+            setFilteredTasks(tasks);
+        }
+    }, [searchQuery, tasks]);
+
+    // Обработчик для кнопки "Respond"
+    const handleRespond = async (taskId) => {
+        try {
+            await updateDoc(doc(db, 'tasks', taskId), {
+                status: 'under review',
+            });
+            Alert.alert('Success', 'Your response has been submitted!');
+        } catch (error) {
+            console.error('Error updating task: ', error);
+            Alert.alert('Error', 'Failed to submit response. Please try again.');
+        }
+    };
 
     const renderTabContent = () => {
-        if (activeTab === 'new') {
+        if (filteredTasks.length === 0) {
             return (
-                <View style={styles.card}>
-                    <View style={styles.card_title}>
-                        <Text style={styles.card_title1}>Work for 400</Text>
-                        <TouchableOpacity>
+                <Text style={styles.noTasksText}>No tasks found.</Text>
+            );
+        }
+
+        return filteredTasks.map((task) => (
+            <View key={task.id} style={styles.card}>
+                <View style={styles.card_title}>
+                    <Text style={styles.card_title1}>Work for {task.price} {task.currency}</Text>
+                    {activeTab === 'new' && (
+                        <TouchableOpacity onPress={() => handleRespond(task.id)}>
                             <Text style={styles.card_title2}>Respond</Text>
                         </TouchableOpacity>
-                    </View>
-                    <Text style={styles.card_description}>
-                        Lorem ipsum dolor sit amet consectetur.
-                        Mauris amet urna volutpat ornare enim praesent elit vitae.
-                        Sed ultrices nulla in vitae. Vel faucibus non posuere rhoncus posuere quis
-                        posuere in in. Nisi enim aliquet etiam nisi facilisis enim erat commodo tellus.
-                    </Text>
-                    <View style={styles.card_status}>
-                        <Text style={styles.card_status1}>Status: </Text>
-                        <Text style={styles.card_status2}>free</Text>
-                    </View>
+                    )}
                 </View>
-            );
-        }
-        if (activeTab === 'responds') {
-            return (
-                <View style={styles.card}>
-                    <View style={styles.card_title}>
-                        <Text style={styles.card_title1}>Work for 400</Text>
-                    </View>
-                    <Text style={styles.card_description}>
-                        Lorem ipsum dolor sit amet consectetur.
-                        Mauris amet urna volutpat ornare enim praesent elit vitae.
-                        Sed ultrices nulla in vitae. Vel faucibus non posuere rhoncus posuere quis
-                        posuere in in. Nisi enim aliquet etiam nisi facilisis enim erat commodo tellus.
-                    </Text>
-                    <View style={styles.card_status}>
-                        <Text style={styles.card_status1}>Status: </Text>
-                        <Text style={styles.card_status2}>free</Text>
-                    </View>
+                <Text style={styles.card_description}>{task.description}</Text>
+                <View style={styles.card_status}>
+                    <Text style={styles.card_status1}>Status: </Text>
+                    <Text style={styles.card_status2}>{task.status}</Text>
                 </View>
-            );
-        }
+            </View>
+        ));
     };
 
     return (
@@ -148,7 +183,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         height: 45,
-        marginTop: 20,
+        marginTop: 10,
+        marginBottom: 10,
         borderRadius: 10,
         backgroundColor: "#00ACC1",
     },
@@ -179,6 +215,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderRadius: 5,
         borderColor: '#a6a6a6',
+        marginBottom: 10,
     },
     card_title: {
         display: 'flex',
@@ -214,5 +251,11 @@ const styles = StyleSheet.create({
     card_status2: {
         fontSize: 13,
         marginLeft: 3,
+    },
+    noTasksText: {
+        fontSize: 16,
+        textAlign: 'center',
+        color: '#666',
+        marginTop: 20,
     },
 });

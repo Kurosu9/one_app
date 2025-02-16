@@ -63,9 +63,9 @@ const LoginScreen = () => {
           <Text style={styles.buttonText}>Login</Text>
         </TouchableOpacity>
 
-        {/* <TouchableOpacity onPress={() => router.push('/register')}>
+        <TouchableOpacity onPress={() => router.push('/register')}>
           <Text style={styles.link}>Register</Text>
-        </TouchableOpacity> */}
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/')}>
           <Text style={styles.link}>Forgot password?</Text>
         </TouchableOpacity>

@@ -20,12 +20,12 @@ const AuthScreen = () => {
                 <Text style={styles.buttonText}>Login</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            {/* <TouchableOpacity 
                 style={styles.button} 
                 onPress={() => router.push('/register')}
             >
                 <Text style={styles.buttonText}>Register</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
         </View>
       </View>
     </SafeAreaView>
@@ -45,6 +45,7 @@ const styles = StyleSheet.create({
   img: {
     width: 500,
     height: 530,
+    marginBottom: 30,
   },
   block_buttons: {
     display: 'flex',

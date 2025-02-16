@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
 import { useState } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from 'firebase/auth';
 import { getFirestore, doc, setDoc } from 'firebase/firestore'; 
 import { app } from '../firebaseConfig'; // Импортируйте настройки Firebase
 
@@ -60,9 +60,7 @@ const RegisterScreen = () => {
 
   const handlePhoneNumberChange = (text: string) => {
     const cleaned = text.replace(/[^\d+]/g, '');
-
     const formatted = cleaned.replace(/(\d{3})(?=\d)/g, '$1 ');
-
     setPhoneNumber(formatted);
   };
 
@@ -73,9 +71,18 @@ const RegisterScreen = () => {
     }
 
     try {
+      // Проверка на наличие уже зарегистрированного email
+      const existingUser = await fetchSignInMethodsForEmail(auth, email);
+      if (existingUser.length > 0) {
+        Alert.alert("Этот email уже используется");
+        return;
+      }
+
       // Регистрируем пользователя в Firebase
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+
+      console.log('User UID:', user.uid);
 
       // Сохраняем дополнительные данные в Firestore
       await setDoc(doc(db, 'users', user.uid), {
@@ -120,8 +127,6 @@ const RegisterScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>SIGN UP</Text>
-
-        <Text style={styles.subtitle}>Registration for 14-15 age click here</Text>
         
         <Text style={styles.label}>INN</Text>
         <TextInput
@@ -275,11 +280,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 500,
     textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#FB8C00',
-    marginVertical: 10,
   },
   label: {
     textAlign: 'left',
