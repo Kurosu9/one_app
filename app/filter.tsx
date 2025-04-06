@@ -2,76 +2,78 @@ import { SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } fro
 import { Picker } from '@react-native-picker/picker';
 import { useState } from 'react';
 
-
 const FilterScreen = () => {
     const [choice, setChoice] = useState('');
-
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
-    const options = ['Default', 'New ones first', 'More expensive at first'];
+    const options = ['По умолчанию', 'Сначала новые', 'Сначала дороже'];
 
     return (
         <SafeAreaView style={styles.safeArea}>
             <View style={styles.container}>
-                <Text style={styles.label}>Age</Text>
+                <Text style={styles.label}>Возраст</Text>
                 <View style={styles.pickerWrapper}>
                     <Picker
                         selectedValue={choice}
                         onValueChange={(itemValue) => setChoice(itemValue)}
                         style={styles.picker}
                     >
-                        <Picker.Item label="Select age" value="" />
-                        <Picker.Item label="13-15" value="male" />
-                        <Picker.Item label="16-22" value="female" />
-                        <Picker.Item label="23-45" value="female" />
+                        <Picker.Item label="Выберите возраст" value="" />
+                        <Picker.Item label="13-15 лет" value="13-15" />
+                        <Picker.Item label="16-22 года" value="16-22" />
+                        <Picker.Item label="23-45 лет" value="23-45" />
                     </Picker>
                 </View>
-                <Text style={styles.label}>Category</Text>
+                
+                <Text style={styles.label}>Категория</Text>
                 <View style={styles.pickerWrapper}>
                     <Picker
                         selectedValue={choice}
                         onValueChange={(itemValue) => setChoice(itemValue)}
                         style={styles.picker}
                     >
-                        <Picker.Item label="Select category" value="" />
-                        <Picker.Item label="Cleaning" value="male" />
-                        <Picker.Item label="Manual labor" value="female" />
-                        <Picker.Item label="Nanny at home" value="female" />
+                        <Picker.Item label="Выберите категорию" value="" />
+                        <Picker.Item label="Уборка" value="cleaning" />
+                        <Picker.Item label="Физический труд" value="manual" />
+                        <Picker.Item label="Няня" value="nanny" />
                     </Picker>
                 </View>
-                <Text style={styles.label}>Location</Text>
+                
+                <Text style={styles.label}>Местоположение</Text>
                 <View style={styles.pickerWrapper}>
                     <Picker
                         selectedValue={choice}
                         onValueChange={(itemValue) => setChoice(itemValue)}
                         style={styles.picker}
                     >
-                        <Picker.Item label="Select location" value="" />
-                        <Picker.Item label="Bishkek" value="male" />
-                        <Picker.Item label="Osh" value="female" />
-                        <Picker.Item label="Naryn" value="female" />
+                        <Picker.Item label="Выберите город" value="" />
+                        <Picker.Item label="Бишкек" value="bishkek" />
+                        <Picker.Item label="Ош" value="osh" />
+                        <Picker.Item label="Нарын" value="naryn" />
                     </Picker>
                 </View>
-                <Text style={styles.label}>Price</Text>
+                
+                <Text style={styles.label}>Цена</Text>
                 <View style={styles.price}>
                     <TextInput
                         style={styles.input}
-                        placeholder="From 0"
-                        secureTextEntry
+                        placeholder="От 0"
+                        keyboardType="numeric"
                     />
                     <TextInput
                         style={styles.input}
-                        placeholder="to 9999999999"
-                        secureTextEntry
+                        placeholder="До 999999"
+                        keyboardType="numeric"
                     />
                 </View>
-                <Text style={styles.label}>Sort</Text>
+                
+                <Text style={styles.label}>Сортировка</Text>
                 <View style={styles.sort}>
                     {options.map((option, index) => (
                         <TouchableOpacity
-                        key={index}
-                        style={styles.radioButtonContainer}
-                        onPress={() => setSelectedOption(option)}
+                            key={index}
+                            style={styles.radioButtonContainer}
+                            onPress={() => setSelectedOption(option)}
                         >
                             <Text style={styles.selectedText}>{option}</Text>
                             <View style={[styles.radioCircle, selectedOption === option && styles.selectedCircle]}>
@@ -79,12 +81,10 @@ const FilterScreen = () => {
                             </View>
                         </TouchableOpacity>
                     ))}
-                    {/* <Text style={styles.selectedText}>
-                        Selected Option: {selectedOption || 'None'}
-                    </Text> */}
                 </View>
+                
                 <TouchableOpacity style={styles.button}>
-                    <Text style={styles.buttonText}>Show</Text>
+                    <Text style={styles.buttonText}>Показать</Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
         textAlign: 'left',
         alignSelf: 'flex-start',
         fontSize: 16,
-        fontWeight: 500,
+        fontWeight: '500',
         marginBottom: 6,
     },
     input: {
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
         height: 30,
         color: 'white',
         marginTop: -9,
-        fontWeight: 500,
+        fontWeight: '500',
     },
 });
 

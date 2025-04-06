@@ -17,7 +17,7 @@ const AuthScreen = () => {
                 style={styles.button} 
                 onPress={() => router.push('/login')}
             >
-                <Text style={styles.buttonText}>Login</Text>
+                <Text style={styles.buttonText}>Логин</Text>
             </TouchableOpacity>
 
             {/* <TouchableOpacity 

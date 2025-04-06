@@ -36,3 +36,7 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+firebaseConfig.js
+config.js
+google-services.json
