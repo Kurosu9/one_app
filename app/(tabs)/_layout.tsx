@@ -26,7 +26,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Dashboards',
+          title: 'Доска',
           headerShown: false,
           tabBarIcon: ({ color }) => (
             <MaterialIcons name="dashboard" size={40} color={color} width={40} height={40}/>
@@ -37,7 +37,7 @@ export default function TabLayout() {
         name="createtask"
         options={{
           title: '',
-          headerTitle: 'Create Task',
+          headerTitle: 'Создание задач',
           headerShown: true,
           // headerStyle: { backgroundColor: '#00ACC1', },
           // headerTintColor: '',
@@ -68,7 +68,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'You',
+          title: 'Мой профиль',
           headerShown: false,
           tabBarIcon: ({ color }) => (
             <FontAwesome name="user-circle-o" size={35} color={color} width={35} height={35}/>

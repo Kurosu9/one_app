@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, Alert, ActivityIndicator } from 'react-native';
 import { ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
@@ -7,7 +7,7 @@ import { useState } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getAuth, createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from 'firebase/auth';
 import { getFirestore, doc, setDoc } from 'firebase/firestore'; 
-import { app } from '../firebaseConfig'; // Импортируйте настройки Firebase
+import { app } from '../firebaseConfig';
 
 const RegisterScreen = () => {
   const [inn, setInn] = useState('');
@@ -22,12 +22,13 @@ const RegisterScreen = () => {
   const [patronymic, setPatronymic] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [date, setDate] = useState(new Date());
-  const [formattedDate, setFormattedDate] = useState("dd.mm.yyyy");
+  const [formattedDate, setFormattedDate] = useState("дд.мм.гггг");
   const [show, setShow] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const router = useRouter();
-  const auth = getAuth(app); // Используем Firebase Authentication
-  const db = getFirestore(app); // Используем Firebase Firestore для хранения данных
+  const auth = getAuth(app);
+  const db = getFirestore(app);
 
   const formatDate = (date: Date) => {
     const day = ("0" + date.getDate()).slice(-2);
@@ -70,10 +71,12 @@ const RegisterScreen = () => {
       return;
     }
 
+    setIsLoading(true);
+
     try {
       // Проверка на наличие уже зарегистрированного email
       const existingUser = await fetchSignInMethodsForEmail(auth, email);
-      if (existingUser.length > 0) {
+      if (existingUser && existingUser.length > 0) {
         Alert.alert("Этот email уже используется");
         return;
       }
@@ -101,7 +104,20 @@ const RegisterScreen = () => {
       // Перенаправляем на экран Dashboard после успешной регистрации
       router.push('/dashboard');
     } catch (error) {
-      Alert.alert('Ошибка регистрации');
+      let errorMessage = "Ошибка регистрации";
+      
+      // Проверяем тип ошибки
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "Этот email уже зарегистрирован";
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = "Неверный формат email";
+      } else {
+        errorMessage = error.message;
+      }
+  
+      Alert.alert('Ошибка регистрации', errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -119,19 +135,19 @@ const RegisterScreen = () => {
       surname &&
       patronymic &&
       phoneNumber &&
-      formattedDate !== "dd.mm.yyyy"
+      formattedDate !== "дд.мм.гггг"
     );
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>SIGN UP</Text>
+        <Text style={styles.title}>РЕГИСТРАЦИЯ</Text>
         
-        <Text style={styles.label}>INN</Text>
+        <Text style={styles.label}>ИНН</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter your INN"
+          placeholder="Введите ваш ИНН"
           autoCapitalize="none"
           keyboardType="numeric"
           value={inn}
@@ -142,7 +158,7 @@ const RegisterScreen = () => {
         <Text style={styles.label}>ID</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter your INN"
+          placeholder="Введите ваш ID"
           autoCapitalize="none"
           keyboardType="numeric"
           value={id}
@@ -150,31 +166,31 @@ const RegisterScreen = () => {
           maxLength={16}
         />
 
-        <Text style={styles.label}>Surname</Text>
+        <Text style={styles.label}>Фамилия</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter your surname"
+          placeholder="Введите вашу фамилию"
           value={surname}
           onChangeText={setSurname}
         />
 
-        <Text style={styles.label}>Name</Text>
+        <Text style={styles.label}>Имя</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter your name"
+          placeholder="Введите ваше имя"
           value={name}
           onChangeText={setName}
         />
 
-        <Text style={styles.label}>Patronymic</Text>
+        <Text style={styles.label}>Отчество</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter your patronymic"
+          placeholder="Введите ваше отчество"
           value={patronymic}
           onChangeText={setPatronymic}
         />
 
-        <Text style={styles.label}>Phone number</Text>
+        <Text style={styles.label}>Номер телефона</Text>
         <TextInput
           style={styles.input}
           value={phoneNumber}
@@ -189,7 +205,7 @@ const RegisterScreen = () => {
           }}
         />
 
-        <Text style={styles.label}>Date of birth</Text>
+        <Text style={styles.label}>Дата рождения</Text>
         <TouchableOpacity onPress={showDatepicker} style={styles.input}>
           <Text style={styles.inputDate}>{formattedDate}</Text>
         </TouchableOpacity>
@@ -204,23 +220,23 @@ const RegisterScreen = () => {
           />
         )}
 
-        <Text style={styles.label}>Sex</Text>
+        <Text style={styles.label}>Пол</Text>
         <View style={styles.pickerWrapper}>
           <Picker
             selectedValue={sex}
             onValueChange={(itemValue) => setSex(itemValue)}
             style={styles.picker}
           >
-            <Picker.Item label="Select your sex" value="" />
-            <Picker.Item label="Male" value="male" />
-            <Picker.Item label="Female" value="female" />
+            <Picker.Item label="Выберите пол" value="" />
+            <Picker.Item label="Мужской" value="male" />
+            <Picker.Item label="Женский" value="female" />
           </Picker>
         </View>
 
-        <Text style={styles.label}>City/Region</Text>
+        <Text style={styles.label}>Город/Регион</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter your city/region"
+          placeholder="Введите ваш город/регион"
           value={location}
           onChangeText={setLocation}
         />
@@ -228,38 +244,41 @@ const RegisterScreen = () => {
         <Text style={styles.label}>Email</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter your email"
+          placeholder="Введите ваш email"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
         />
 
-        <Text style={styles.label}>Password</Text>
+        <Text style={styles.label}>Пароль</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter your password"
+          placeholder="Введите пароль"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
         />
 
-        <Text style={styles.label}>Repeat password</Text>
+        <Text style={styles.label}>Повторите пароль</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter your password again"
+          placeholder="Введите пароль еще раз"
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry
         />
-
-        <TouchableOpacity
-          style={[styles.button, !isFormValid() && styles.buttonDisabled]}
-          onPress={handleRegister}
-          disabled={!isFormValid()}
-        >
-          <Text style={styles.buttonText}>Sign up</Text>
-        </TouchableOpacity>
+        {isLoading ? (
+          <ActivityIndicator style={styles.loading} size="large" color="#fb8c00"/>
+        ) : (
+          <TouchableOpacity
+            style={[styles.button, !isFormValid() && styles.buttonDisabled]}
+            onPress={handleRegister}
+            disabled={!isFormValid()}
+          >
+            <Text style={styles.buttonText}>Зарегистрироваться</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -320,13 +339,17 @@ const styles = StyleSheet.create({
     color: '#333',
     marginVertical: 'auto',
   },
+  loading: {
+    marginBottom: 30,
+    height: 120,
+  },
   button: {
     backgroundColor: '#00ACC1',
     padding: 20,
     marginVertical: 30,
     borderRadius: 5,
     alignItems: 'center',
-    width: '50%',
+    width: '100%',
     height: 50,
     margin: 'auto',
     marginBottom: 70,

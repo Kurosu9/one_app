@@ -4,89 +4,280 @@ import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
-import { db } from '../../firebaseConfig';
+import { getDoc, addDoc, where } from 'firebase/firestore';
+import { db, auth } from '../../firebaseConfig';
 import { collection, doc, onSnapshot, query, updateDoc } from 'firebase/firestore';
-
 
 export default function Tab() {
 
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState('new'); // New tab is the default
+    const [activeTab, setActiveTab] = useState('new'); // Вкладка "Новые" по умолчанию
     const [tasks, setTasks] = useState([]); // Состояние для хранения задач
     const [filteredTasks, setFilteredTasks] = useState([]); // Состояние для отфильтрованных задач
     const [searchQuery, setSearchQuery] = useState(''); // Состояние для поиска
+    const [isLoading, setIsLoading] = useState(true);
+    const { TOKEN } = require('../../config');
 
+    // Унифицированная загрузка и фильтрация задач
     useEffect(() => {
-        const q = query(collection(db, 'tasks'));
+        setIsLoading(true);
+        
+        let q;
+        if (activeTab === 'new') {
+            // Для вкладки "Новые" - только свободные задачи, где текущий пользователь НЕ является создателем
+            q = query(
+                collection(db, 'tasks'),
+                where('status', '==', 'free'),
+                where('userId', '!=', auth.currentUser?.uid || '') // Исключаем свои задачи
+            );
+        } else if (activeTab === 'responds') {
+            // Для вкладки "Мои отклики" - задачи где текущий пользователь является исполнителем
+            if (!auth.currentUser?.uid) {
+                setFilteredTasks([]);
+                setIsLoading(false);
+                return;
+            }
+            q = query(
+                collection(db, 'tasks'),
+                where('responderId', '==', auth.currentUser.uid),
+                where('status', 'in', ['under review', 'hired']) // И задачи на рассмотрении, и принятые
+            );
+        } else {
+            // Все задачи (если понадобится для других вкладок)
+            q = query(collection(db, 'tasks'));
+        }
+    
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const tasksList = [];
             querySnapshot.forEach((doc) => {
-                tasksList.push({ id: doc.id, ...doc.data() });
+                const taskData = doc.data();
+                // Добавляем только актуальные задачи (не старше 30 дней)
+                const isRecent = !taskData.createdAt || 
+                               (taskData.createdAt.toDate() > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+                
+                if (isRecent) {
+                    tasksList.push({ 
+                        id: doc.id, 
+                        ...taskData,
+                        // Форматируем дату для отображения
+                        formattedDate: taskData.createdAt?.toDate().toLocaleDateString() || 'N/A'
+                    });
+                }
             });
+            
+            // Сортируем по дате (новые сначала)
+            tasksList.sort((a, b) => 
+                (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0)
+            );
+            
             setTasks(tasksList);
-            setFilteredTasks(tasksList); // Инициализируем отфильтрованные задачи
+            
+            // Применяем поиск если есть запрос
+            if (searchQuery) {
+                const filtered = tasksList.filter(task =>
+                    task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    task.price.toString().includes(searchQuery) ||
+                    (task.responderName && task.responderName.toLowerCase().includes(searchQuery.toLowerCase()))
+                );
+                setFilteredTasks(filtered);
+            } else {
+                setFilteredTasks(tasksList);
+            }
+            
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Ошибка загрузки задач:", error);
+            setIsLoading(false);
+            Alert.alert("Ошибка", "Не удалось загрузить задачи");
         });
-
+    
         return () => unsubscribe();
-    }, []);
+    }, [activeTab, auth.currentUser?.uid, searchQuery]);
 
-    // Фильтрация задач по статусу (вкладки New и Responds)
+    // Оптимизированный поиск
     useEffect(() => {
-        if (activeTab === 'new') {
-            setFilteredTasks(tasks.filter(task => task.status === 'free'));
-        } else if (activeTab === 'responds') {
-            setFilteredTasks(tasks.filter(task => task.status === 'under review' || task.status === 'hired'));
+        if (!searchQuery) {
+            setFilteredTasks(tasks);
+            return;
         }
-    }, [activeTab, tasks]);
-
-    // Поиск задач
-    useEffect(() => {
-        if (searchQuery) {
+        
+        const timer = setTimeout(() => {
             const filtered = tasks.filter(task =>
                 task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 task.price.toString().includes(searchQuery)
             );
             setFilteredTasks(filtered);
-        } else {
-            setFilteredTasks(tasks);
-        }
+        }, 300); // Задержка для debounce
+            
+        return () => clearTimeout(timer);
     }, [searchQuery, tasks]);
 
-    // Обработчик для кнопки "Respond"
-    const handleRespond = async (taskId) => {
+    // Обработчик для кнопки "Откликнуться"
+    const handleRespond = async (taskId: string) => {
         try {
-            await updateDoc(doc(db, 'tasks', taskId), {
-                status: 'under review',
-            });
-            Alert.alert('Success', 'Your response has been submitted!');
+          const userId = auth.currentUser?.uid;
+          if (!userId) {
+            Alert.alert('Ошибка', 'Войдите в систему');
+            return;
+          }
+      
+          // Получаем данные задачи и пользователя
+          const [taskDoc, userDoc] = await Promise.all([
+            getDoc(doc(db, 'tasks', taskId)),
+            getDoc(doc(db, 'users', userId))
+          ]);
+      
+          if (!taskDoc.exists()) {
+            Alert.alert('Ошибка', 'Задание не найдено');
+            return;
+          }
+      
+          const taskData = taskDoc.data();
+          const userData = userDoc.data() || {};
+      
+          // Проверки статуса задачи
+          if (taskData.status !== 'free') {
+            Alert.alert('Уже занято', 'Это задание уже в работе');
+            return;
+          }
+      
+          if (taskData.userId === userId) {
+            Alert.alert('Ошибка', 'Нельзя откликаться на свои задания');
+            return;
+          }
+      
+          // Безопасный расчет возраста
+          const getAge = () => {
+            try {
+              // Если birthdate - Timestamp (Firestore)
+              if (userData.birthdate?.toDate) {
+                const birthDate = userData.birthdate.toDate();
+                return new Date().getFullYear() - birthDate.getFullYear();
+              }
+              // Если birthdate - строка в формате "dd.mm.yyyy"
+              if (typeof userData.birthdate === 'string') {
+                const [day, month, year] = userData.birthdate.split('.');
+                return new Date().getFullYear() - parseInt(year);
+              }
+            } catch (e) {
+              console.warn('Ошибка расчета возраста:', e);
+            }
+            return null;
+          };
+      
+          const age = getAge();
+      
+          Alert.alert('Подтверждение', 'Откликнуться на задание?', [
+            { text: 'Отмена', style: 'cancel' },
+            {
+              text: 'Да',
+              onPress: async () => {
+                setIsLoading(true);
+                try {
+                  // Обновляем задачу
+                  await updateDoc(doc(db, 'tasks', taskId), {
+                    status: 'under review',
+                    responderId: userId,
+                    responderData: {
+                      name: userData.name || 'Аноним',
+                      phone: userData.phoneNumber || 'Не указан',
+                      age: age ? `${age} лет` : 'Не указан'
+                    },
+                    updatedAt: new Date()
+                  });
+      
+                  // Отправляем уведомление в Telegram
+                  const creatorDoc = await getDoc(doc(db, 'users', taskData.userId));
+                  const creatorData = creatorDoc.data();
+      
+                  if (creatorData?.telegramChatId) {
+                    await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        chat_id: creatorData.telegramChatId,
+                        text: `🆕 Новый отклик!\n\nЗадание: ${taskData.description}`,
+                        reply_markup: {
+                          inline_keyboard: [
+                            [
+                              { 
+                                text: '📞 Контакты', 
+                                callback_data: `show_${taskId}`
+                              }
+                            ],
+                            [
+                              { 
+                                text: '✅ Принять', 
+                                callback_data: `accept_${taskId}`
+                              },
+                              { 
+                                text: '❌ Отклонить', 
+                                callback_data: `reject_${taskId}`
+                              }
+                            ]
+                          ]
+                        }
+                      })
+                    });
+                  }
+      
+                  Alert.alert('Успех', 'Отклик отправлен!');
+                } catch (error) {
+                  console.error('Ошибка:', error);
+                  Alert.alert('Ошибка', 'Не удалось отправить отклик');
+                } finally {
+                  setIsLoading(false);
+                }
+              }
+            }
+          ]);
         } catch (error) {
-            console.error('Error updating task: ', error);
-            Alert.alert('Error', 'Failed to submit response. Please try again.');
+          console.error('Ошибка handleRespond:', error);
+          Alert.alert('Ошибка', 'Произошла ошибка');
         }
     };
 
     const renderTabContent = () => {
         if (filteredTasks.length === 0) {
-            return (
-                <Text style={styles.noTasksText}>No tasks found.</Text>
-            );
+            return <Text style={styles.noTasksText}>Задания не найдены.</Text>;
         }
-
+    
         return filteredTasks.map((task) => (
             <View key={task.id} style={styles.card}>
                 <View style={styles.card_title}>
-                    <Text style={styles.card_title1}>Work for {task.price} {task.currency}</Text>
-                    {activeTab === 'new' && (
+                    <Text style={styles.card_title1}>Работа за {task.price} {task.currency}</Text>
+                    
+                    {activeTab === 'new' && task.status === 'under review' ? (
+                        <View style={styles.pendingBadge}>
+                            <Text style={styles.pendingText}>На рассмотрении</Text>
+                        </View>
+                    ) : activeTab === 'new' ? (
                         <TouchableOpacity onPress={() => handleRespond(task.id)}>
-                            <Text style={styles.card_title2}>Respond</Text>
+                            <Text style={styles.card_title2}>Откликнуться</Text>
                         </TouchableOpacity>
-                    )}
+                    ) : null}
                 </View>
+                
                 <Text style={styles.card_description}>{task.description}</Text>
+                
                 <View style={styles.card_status}>
-                    <Text style={styles.card_status1}>Status: </Text>
-                    <Text style={styles.card_status2}>{task.status}</Text>
+                    <Text style={styles.card_status1}>Статус: </Text>
+                    <Text style={[
+                        styles.card_status2,
+                        task.status === 'hired' && styles.statusHired,
+                        task.status === 'under review' && styles.statusUnderReview
+                    ]}>
+                        {task.status === 'hired' ? 'Назначено' : 
+                         task.status === 'under review' ? 'На рассмотрении' : 
+                         task.status === 'free' ? 'Свободно' : task.status}
+                    </Text>
                 </View>
+                
+                {task.status === 'under review' && (
+                    <Text style={styles.reviewNote}>
+                        ⏳ Это задание сейчас рассматривается другим пользователем
+                    </Text>
+                )}
             </View>
         ));
     };
@@ -99,15 +290,14 @@ export default function Tab() {
                         <Ionicons name="search-outline" size={20} color="black" style={styles.search_img}/>
                         <TextInput
                             style={styles.search_input}
-                            placeholder='Search...'
+                            placeholder='Поиск...'
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
                         />
                     </View>
                     <View style={styles.filter_not}>
                         <TouchableOpacity onPress={() => router.push('/filter')}>
                             <Feather name="filter" size={26} color="#FB8C00" style={styles.search_img}/>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => router.push('/notification')}>
-                            <Ionicons name="notifications-outline" size={28} color="#FB8C00" style={styles.search_img}/>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -116,19 +306,19 @@ export default function Tab() {
                         style={[styles.tab, activeTab === 'new' && styles.activeTab]}
                         onPress={() => setActiveTab('new')}
                     >
-                        <Text style={[styles.tabText]}>New</Text>
+                        <Text style={[styles.tabText]}>Новые</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.tab, activeTab === 'responds' && styles.activeTab]}
                         onPress={() => setActiveTab('responds')}
                     >
-                        <Text style={[styles.tabText]}>Responds</Text>
+                        <Text style={[styles.tabText]}>Мои отклики</Text>
                     </TouchableOpacity>
                 </View>
 
-                <View style={styles.content}>
+                <ScrollView contentContainerStyle={styles.content}>
                     {renderTabContent()}
-                </View>
+                </ScrollView>
             </ScrollView>
         </SafeAreaView>
     )
@@ -141,9 +331,7 @@ const styles = StyleSheet.create({
     },
     container: {
         flex: 1,
-        // justifyContent: 'center',
         paddingHorizontal: 15,
-        // margin: 6,
         marginTop: 15,
     },
     search: {
@@ -157,7 +345,7 @@ const styles = StyleSheet.create({
         borderColor: '#DDD',
         borderRadius: 5,
         paddingHorizontal: 12,
-        width: "80%",
+        width: "90%",
         backgroundColor: '#FFF',
         height: 40,
     },
@@ -209,6 +397,7 @@ const styles = StyleSheet.create({
     },
     content: {
         marginTop: 7,
+        paddingBottom: 7,
     },
     card: {
         backgroundColor: '#fff',
@@ -257,5 +446,30 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: '#666',
         marginTop: 20,
+    },
+    pendingBadge: {
+        backgroundColor: '#FFE082',
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        borderRadius: 12,
+    },
+    pendingText: {
+        color: '#5D4037',
+        fontSize: 12,
+        fontWeight: '500',
+    },
+    statusHired: {
+        color: '#4CAF50',
+        fontWeight: 'bold',
+    },
+    statusUnderReview: {
+        color: '#FFA000',
+        fontWeight: 'bold',
+    },
+    reviewNote: {
+        fontSize: 12,
+        color: '#616161',
+        padding: 8,
+        fontStyle: 'italic',
     },
 });
