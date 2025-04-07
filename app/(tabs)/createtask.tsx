@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, Scro
 import { db, auth } from '../../firebaseConfig';
 import { collection, addDoc, setDoc, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { MaterialIcons } from '@expo/vector-icons';
+import PaymentModal from '../paymentmodal';
 
 export default function Tab() {
   const [price, setPrice] = useState('');
@@ -13,6 +14,7 @@ export default function Tab() {
   const [isLoading, setIsLoading] = useState(false);
   const [generatedCode, setGeneratedCode] = useState('');
   const [isTelegramConnected, setIsTelegramConnected] = useState(false);
+  const [isPaymentModalVisible, setPaymentModalVisible] = useState(false);
   const { TOKEN } = require('../../config');
 
   // Проверка статуса Telegram
@@ -87,63 +89,80 @@ export default function Tab() {
       return;
     }
 
+    const amount = parseInt(price) || 0;
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Ошибка', 'Введите корректную сумму');
+      return;
+    }
+
     Alert.alert(
       'Подтверждение',
-      'Опубликовать задание?',
+      'Вы точно хотите опубликовать задание?',
       [
         { text: 'Отменить', style: 'cancel' },
         {
           text: 'Опубликовать',
-          onPress: async () => {
-            setIsLoading(true);
-            try {
-              const userId = auth.currentUser?.uid;
-              await addDoc(collection(db, 'tasks'), {
-                price,
-                description,
-                currency,
-                method,
-                status: 'free',
-                createdAt: new Date(),
-                userId,
-              });
-              
-              // Только Telegram-уведомление
-              const userDoc = await getDoc(doc(db, 'users', userId));
-              if (userDoc.exists() && userDoc.data().telegramChatId) {
-                try {
-                  const response = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }, // Добавьте headers
-                    body: JSON.stringify({
-                      chat_id: userDoc.data().telegramChatId,
-                      text: `✅ Задание опубликовано!\n${description}`,
-                      parse_mode: 'Markdown' // Добавьте parse_mode
-                    })
-                  });
-                  
-                  if (!response.ok) {
-                    console.error('Ошибка Telegram API:', await response.text());
-                  }
-                } catch (error) {
-                  console.error('Ошибка отправки в Telegram:', error);
-                }
-              }
-
-              Alert.alert('Успех!', 'Задание опубликовано!');
-              setPrice('');
-              setDescription('');
-              setCurrency('');
-              setMethod('');
-            } catch (error) {
-              Alert.alert('Ошибка', 'Не удалось опубликовать');
-            } finally {
-              setIsLoading(false);
-            }
+          onPress: () => {
+            // Показываем модалку оплаты после подтверждения
+            setPaymentModalVisible(true);
           }
         }
       ]
     );
+  };
+
+  const handlePaymentConfirm = async () => {
+    setIsLoading(true);
+    try {
+      const userId = auth.currentUser?.uid;
+      const amount = parseInt(price) || 0;
+      const fee = Math.ceil(amount * 0.05);
+      
+      // Сохраняем задание с информацией о платеже
+      await addDoc(collection(db, 'tasks'), {
+        price: amount,
+        fee,
+        description,
+        currency,
+        method,
+        status: 'free',
+        paymentStatus: 'held', // Средства на удержании
+        createdAt: new Date(),
+        userId,
+      });
+      
+      // Уведомление в Telegram
+      if (isTelegramConnected) {
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (userDoc.exists() && userDoc.data().telegramChatId) {
+          await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: userDoc.data().telegramChatId,
+              text: `✅ Задание опубликовано!\n${description}\n\nСумма: ${amount} KGS (комиссия: ${fee} KGS)`,
+              parse_mode: 'Markdown'
+            })
+          });
+        }
+      }
+
+      Alert.alert(
+        'Успех!', 
+        `Задание опубликовано!\n\nСумма вознаграждения: ${amount} KGS\nКомиссия: ${fee} KGS`
+      );
+      
+      // Сброс полей
+      setPrice('');
+      setDescription('');
+      setCurrency('');
+      setMethod('');
+    } catch (error) {
+      Alert.alert('Ошибка', 'Не удалось опубликовать задание');
+    } finally {
+      setIsLoading(false);
+      setPaymentModalVisible(false);
+    }
   };
 
   return (
@@ -250,6 +269,12 @@ export default function Tab() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <PaymentModal
+        visible={isPaymentModalVisible}
+        onClose={() => setPaymentModalVisible(false)}
+        onConfirm={handlePaymentConfirm}
+        amount={parseInt(price) || 0}
+      />
     </SafeAreaView>
   );
 }

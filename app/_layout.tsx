@@ -10,6 +10,10 @@ export default function Layout() {
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="register" options={{ headerShown: false }} />
       <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen 
+        name="paymentmethods"  
+        options={{ title: 'Привязать карту' }}
+      />
       <Stack.Screen name="notification" options={{ 
           title: 'Notification',
           headerTintColor: 'black',

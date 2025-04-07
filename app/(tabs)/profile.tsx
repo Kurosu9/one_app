@@ -7,6 +7,7 @@ import Entypo from '@expo/vector-icons/Entypo';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 
 export default function ProfileTab() {
   const [userData, setUserData] = useState(null);
@@ -185,6 +186,14 @@ export default function ProfileTab() {
 
         <Text style={[styles.card_title, { marginTop: 5, marginBottom: 10 }]}>Настройки</Text>
         
+        <TouchableOpacity 
+          style={styles.set}
+          onPress={() => router.push('/paymentmethods')}
+        >
+          <MaterialIcons name="credit-card" size={20} color="#FB8C00" />
+          <Text style={styles.set_text}>Привязать карту</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.set} onPress={handleSignOut}>
           <Entypo name="log-out" size={20} color="#FB8C00" />
           <Text style={styles.set_text}>Выйти из аккаунта</Text>
